@@ -1,51 +1,61 @@
 # CS2 Match Overtime
 
-竞技模式打到常规赛平局（`mp_maxrounds 24` 时为 12-12）时，先暂停比赛，交给 **Vote Improver** 做一次只计真人的是/否投票，再决定走原版加时还是平局结束。
+When a competitive match reaches a regulation tie (`12-12` at `mp_maxrounds 24`), this plugin pauses the game and asks **[Vote Improver](https://github.com/xiaoyueyoqwq/CS2-Vote-Improver)** for a humans-only yes/no vote. Pass continues vanilla overtime; fail ends the match as a draw.
 
-本插件不绘制投票 HUD，也不监听 `vote`。选民规则与 Vote Improver 相同：排除 HLTV、引擎 bot、以及 `botidentity:api` 托管的 bot。玩家需按 Vote Improver README 绑定 F1/F2。
+This plugin does not draw the vote HUD and does not listen to `vote`. The electorate matches Vote Improver: HLTV, engine bots, and `botidentity:api` managed bots are excluded.
 
-## 行为
+> [!IMPORTANT]
+> The plugin counts the client commands `vote option1` (yes) and `vote option2` (no). If F1/F2 are bound to something else, the HUD appears but the ballot never arrives. Run this in the CS2 console, or add it to autoexec:
+>
+> ```
+> bind F1 "vote option1"
+> bind F2 "vote option2"
+> ```
+>
+> Source bind syntax is `bind <key> "<command>"`. `bind voteoption1 F1` reverses the arguments, and there is no `voteoption1` command. To test without a keybind, type `vote option1` or `vote option2` in the console while a vote is open.
 
-1. 仅 `game_type 0` / `game_mode 1`。其它模式不拦截。
-2. 赛点（12-11 / 11-12）且场上有真人时，运行时打开 `mp_overtime_enable`，并把 `mp_overtime_startmoney` 设为 12500。不写磁盘 cfg。
-3. 平局回合结束：`mp_pause_match`，向 `voteimprover:api` 发起投票。F1 进入加时，F2 / 超时 / 不够法定人数则平局。
-4. 通过后 `mp_unpause_match`，之后的加时（含 15-15）交给引擎，不再投票。
-5. 零真人时不打开加时，保持现网的 12-12 平局。
-6. 拿不到 `voteimprover:api` 时禁用拦截，同样保持现网平局。
+## Behaviour
 
-## 依赖
+1. Competitive only (`game_type 0` / `game_mode 1`). Other modes are not intercepted.
+2. On match point (12-11 / 11-12) with at least one human, enable `mp_overtime_enable` at runtime and set `mp_overtime_startmoney` to 12500. These CVars are not written to disk cfg.
+3. When the tying round ends: `mp_pause_match`, then start a Vote Improver ballot. F1 continues to overtime; F2, timeout, or a failed quorum ends the match as a draw.
+4. On pass: `mp_unpause_match`. Later overtime, including 15-15, is left to the engine; there is no second vote.
+5. With zero humans, overtime is not enabled and the match stays a vanilla 12-12 draw.
+6. If `voteimprover:api` is missing, intercept is disabled and the match stays a vanilla draw.
 
-- CounterStrikeSharp API 1.0.371，`net10.0`
-- Vote Improver **2.1.0+**（提供 `voteimprover:api` 和 `VoteImproverApi.dll`）
-- BotIdentity（`botidentity:api`）：用于识别托管 bot；缺失时只能靠引擎 `IsBot`
+## Requirements
 
-`VoteImproverApi.dll` 放两处：`plugins/VoteImprover/`（Vote Improver 自己加载），以及 CSS `shared/VoteImproverApi/VoteImproverApi.dll`（消费者解析程序集，与现网 `BotIdentityApi` 相同）。只放在 VoteImprover 目录时，CSS 加载本插件会找不到该程序集。不要再复制一份到 `MatchOvertime/`。本插件在 `OnAllPluginsLoaded` 解析 capability，不依赖目录字母序。
+- CounterStrikeSharp API 1.0.371, `net10.0`
+- Vote Improver **2.1.0+** (`voteimprover:api` and `VoteImproverApi.dll`)
+- BotIdentity (`botidentity:api`) to identify managed bots; without it only the engine `IsBot` flag is used
 
-## 构建与部署
+`VoteImproverApi.dll` belongs in two places: `plugins/VoteImprover/` for Vote Improver itself, and CSS `shared/VoteImproverApi/VoteImproverApi.dll` for consumers, same layout as `BotIdentityApi`. Leaving it only next to Vote Improver makes CSS fail to load this plugin. Do not copy a second Api DLL into `MatchOvertime/`. Capability resolution happens in `OnAllPluginsLoaded`, so folder alphabetical order does not matter.
+
+## Build and deploy
 
 ```bash
 dotnet build -c Release
 ```
 
-把 `bin/Release/net10.0/MatchOvertime.dll` 放到：
+Copy `bin/Release/net10.0/MatchOvertime.dll` to:
 
 `game/csgo/addons/counterstrikesharp/plugins/MatchOvertime/`
 
-同时把 Vote Improver 升到 2.1.0（`plugins/VoteImprover/`，含 `VoteImproverApi.dll`），把同一份 Api 放到 `shared/VoteImproverApi/`，并卸掉旧的 `plugins/BotVoteFix/`，避免两套 `vote` 监听并存。空服按维护手册第 8 节备份后再 reload。热加载若因缺 Api 留下 UNREGISTERED 槽，需要进程重启才能清掉。有玩家在线时不要换 DLL、不要改 CVar。
+Also ship Vote Improver 2.1.0 (`plugins/VoteImprover/` including `VoteImproverApi.dll`), copy the same Api DLL to `shared/VoteImproverApi/`, and remove the old `plugins/BotVoteFix/` so two `vote` listeners are not loaded together. Back up, then reload on an empty server. A hot-load that fails with a missing Api leaves an UNREGISTERED slot that only a process restart clears. Do not replace DLLs or change CVars while players are connected.
 
-配置在首次加载后生成：
+The config is generated on first load:
 
 `addons/counterstrikesharp/configs/plugins/MatchOvertime/MatchOvertime.json`
 
-| 键 | 默认 | 含义 |
+| Key | Default | Meaning |
 |---|---|---|
-| `Enabled` | true | 总开关 |
-| `OvertimeStartMoney` | 12500 | 加时每半场起手（EWC） |
-| `VoteDurationSeconds` | 0 | 0 = 跟 Vote Improver / `sv_vote_timer_duration` |
-| `VoteDisplayString` | `#SFUI_vote` | VoteStart 的 Panorama token |
-| `VotePassedString` | `#SFUI_vote_passed` | 通过时的 token |
-| `VoteDisplayDetails` | `是否进入加时赛？` | HUD 第二行 |
+| `Enabled` | true | Master switch |
+| `OvertimeStartMoney` | 12500 | Overtime half start money |
+| `VoteDurationSeconds` | 0 | `0` follows Vote Improver / `sv_vote_timer_duration` |
+| `VoteDisplayString` | `#SFUI_vote` | VoteStart Panorama token |
+| `VotePassedString` | `#SFUI_vote_passed` | Pass token |
+| `VoteDisplayDetails` | `是否进入加时赛？` | HUD second line |
 
-## 回滚
+## Rollback
 
-删除 `plugins/VoteImprover/`、`plugins/MatchOvertime/` 和 `shared/VoteImproverApi/`，把现网原来的 `plugins/BotVoteFix/` 2.0.2 放回去，reload 或重启。运行时若已改过 `mp_overtime_enable`，reload 后本插件会在换图 / 新局时写回 0。
+Delete `plugins/VoteImprover/`, `plugins/MatchOvertime/`, and `shared/VoteImproverApi/`. Restore the previous `plugins/BotVoteFix/` 2.0.2, then reload or restart. If `mp_overtime_enable` was changed at runtime, this plugin writes it back to 0 on map change / new match after reload.
