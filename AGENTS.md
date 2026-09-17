@@ -6,3 +6,4 @@
 - 常规赛平局只投一次。加时里的 15-15 不要再暂停。
 - `TerminateRound(RoundDraw)` 在引擎已经进入加时后是否真的结束比赛，必须空服打穿后再改失败路径。不要用 `mp_restartgame` 冒充平局。
 - 有玩家在线时不 reload、不改 CVar。部署走 CS2 维护手册第 8 节。
+- `VoteImproverApi.dll` 必须进 CSS `shared/VoteImproverApi/`。只放在 `plugins/VoteImprover/` 时，加载本插件会 `FileNotFoundException: VoteImproverApi`；失败后的 UNREGISTERED 槽只能进程重启清掉。

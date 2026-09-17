@@ -19,7 +19,7 @@
 - Vote Improver **2.1.0+**（提供 `voteimprover:api` 和 `VoteImproverApi.dll`）
 - BotIdentity（`botidentity:api`）：用于识别托管 bot；缺失时只能靠引擎 `IsBot`
 
-`VoteImproverApi.dll` 只放在 `plugins/VoteImprover/`。本插件在 `OnAllPluginsLoaded` 解析 capability，不依赖目录字母序。不要把 Api DLL 再复制一份到 `MatchOvertime/`。
+`VoteImproverApi.dll` 放两处：`plugins/VoteImprover/`（Vote Improver 自己加载），以及 CSS `shared/VoteImproverApi/VoteImproverApi.dll`（消费者解析程序集，与现网 `BotIdentityApi` 相同）。只放在 VoteImprover 目录时，CSS 加载本插件会找不到该程序集。不要再复制一份到 `MatchOvertime/`。本插件在 `OnAllPluginsLoaded` 解析 capability，不依赖目录字母序。
 
 ## 构建与部署
 
@@ -31,7 +31,7 @@ dotnet build -c Release
 
 `game/csgo/addons/counterstrikesharp/plugins/MatchOvertime/`
 
-同时把 Vote Improver 升到 2.1.0（`plugins/VoteImprover/`，含 `VoteImproverApi.dll`），并卸掉旧的 `plugins/BotVoteFix/`，避免两套 `vote` 监听并存。空服按维护手册第 8 节备份后再 reload。有玩家在线时不要换 DLL、不要改 CVar。
+同时把 Vote Improver 升到 2.1.0（`plugins/VoteImprover/`，含 `VoteImproverApi.dll`），把同一份 Api 放到 `shared/VoteImproverApi/`，并卸掉旧的 `plugins/BotVoteFix/`，避免两套 `vote` 监听并存。空服按维护手册第 8 节备份后再 reload。热加载若因缺 Api 留下 UNREGISTERED 槽，需要进程重启才能清掉。有玩家在线时不要换 DLL、不要改 CVar。
 
 配置在首次加载后生成：
 
@@ -48,4 +48,4 @@ dotnet build -c Release
 
 ## 回滚
 
-删除 `plugins/VoteImprover/` 和 `plugins/MatchOvertime/`，把现网原来的 `plugins/BotVoteFix/` 2.0.2 放回去，reload。运行时若已改过 `mp_overtime_enable`，reload 后本插件会在换图 / 新局时写回 0。
+删除 `plugins/VoteImprover/`、`plugins/MatchOvertime/` 和 `shared/VoteImproverApi/`，把现网原来的 `plugins/BotVoteFix/` 2.0.2 放回去，reload 或重启。运行时若已改过 `mp_overtime_enable`，reload 后本插件会在换图 / 新局时写回 0。
