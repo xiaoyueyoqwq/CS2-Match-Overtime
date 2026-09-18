@@ -57,6 +57,6 @@ The config is generated on first load:
 | `VotePassedString` | `#SFUI_vote_passed_restart_game` | VotePass first line |
 | `VoteStartNotify` | `[加时赛] 当前比分战平。请按 F1 或 F2 投票决定是否进入加时。` | Chat line sent to humans when the vote opens. `[加时赛]` and F1 are green, F2 is red. Empty string disables it |
 
-## Rollback
+## License
 
-Delete `plugins/VoteImprover/`, `plugins/MatchOvertime/`, and `shared/VoteImproverApi/`. Restore the previous `plugins/BotVoteFix/` 2.0.2, then reload or restart. If `mp_overtime_enable` was changed at runtime, this plugin writes it back to 0 on map change / new match after reload.
+[GNU Affero General Public License v3.0](LICENSE)
