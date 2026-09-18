@@ -2,8 +2,15 @@
 
 - 投票 GUI、选民、计票全部在 Vote Improver。本插件只暂停比赛、改运行时加时 CVar、按 `voteimprover:api` 回调解暂停或强制平局。
 - 选民必须是真人：不要在这里再实现一份 `vote` 监听，也不要把 bot 算进“有没有人可以投票”。
-- 不要把 `mp_overtime_enable` 写进 `server.cfg` 或 gamemode cfg。只在赛点临时打开，新局写回 0。
+- 不要把 `mp_overtime_enable` 写进 `server.cfg` 或 gamemode cfg。有真人时在开局（`begin_new_match` / `match_start`）就把运行时加时打开；赛点再写已经来不及。新图 / 无人 / 投票失败时写回 0。
+- 测加时必须 `mp_halftime 1`。`mp_maxrounds 2` 且 `mp_halftime 0` 时，即使 `mp_overtime_enable` 已是 true，引擎也不开加时，会走平局结束画面。正式竞技默认有半场。半场的 `match_start` 不得把已 armed 的加时关掉。
 - 常规赛平局只投一次。加时里的 15-15 不要再暂停。
-- `TerminateRound(RoundDraw)` 在引擎已经进入加时后是否真的结束比赛，必须空服打穿后再改失败路径。不要用 `mp_restartgame` 冒充平局。
-- 有玩家在线时不 reload、不改 CVar。部署走 CS2 维护手册第 8 节。
+- `TerminateRound(RoundDraw)` 加上 `mp_overtime_enable 0` 不能把已经 committed 的加时撤掉：引擎在平局 `round_end` 就写了 `m_nOvertimePlaying`。否决后必须把 `OvertimePlaying` 清 0、`GamePhase` 写成 `GAMEPHASE_MATCH_ENDED`(5)，并 `EndMatchOnThink=true` / `EndMatchOnRoundReset=true`，再 TerminateRound，下一帧再写一次。`begin_new_match` / `match_start` 必须忽略 `DrawDecided`，否则会把结束标志清掉。失败后进入 `DrawDecided`，禁止再开投票。不要用 `mp_restartgame` 冒充平局。
+- 常规赛平局在那一拍 `round_end` 立刻 `mp_pause_match` + `TryStartVote`。不要再 defer 到加时第一回合 `round_start`，否则会先走进队伍展示。`mp_pause_match` 通常要到下一回合冻结才卡住模拟，拦不住 `round_start`。平局进加时走的是半场/队伍展示：`mp_halftime_duration` + `mp_team_intro_time`（测试里 2+6.5=8.5s），不是 `mp_round_restart_delay`。只在开投时把这三项拉到投票时长+8，并 `mp_halftime_pausetimer 1`；投完写回。不要在赛点就开 pausetimer：短局 `mp_maxrounds 2` 时赛点就是常规半场，会把第二回合卡住。超时若已经走进加时 `gamePhase=2` 再 FailToDraw，服务端会进结算/换图倒计时，客户端还停在加时里。
+- `OvertimeAccepted` 在加时打完后必须清掉。`cs_win_panel_match`、热身中的 `round_start`、`warmup_end` 都要 `ResetMatch`。`begin_new_match` / `match_start` 仍忽略 `OtArmed` / `Voting` / `OvertimeAccepted`，因为加时半场也会发这些事件；若在这里 reset 会把刚投过 Yes 的加时关掉。
+- 不要写 `mp_endmatch_votenextmap`。测试短局若把它设成 0，赛后选图会创建失败（客户端失败音），倒计时后同一张图重开。测完必须写回 1。
+- 客户端没有「是否进入加时赛」这条 `#SFUI_vote_*`。纯中文、`#SFUI_vote`、记分板 `#SFUI_Scoreboard_Overtime` 都会让 HUD 空白。保持 `#SFUI_vote_restart_game`（第一行「重新开始比赛？」）。这条词条没有 `{s:s1}`，`details_str` 不会画出来，不要再传 `VoteDisplayDetails`。开投后只给真人 `PrintToChat` 一条 `VoteStartNotify`，默认「[加时赛] 当前比分战平。请按 F1 或 F2 投票决定是否进入加时。」；`[加时赛]` 和 F1 用 `ChatColors.Green`，F2 用 `ChatColors.Red`，颜色在代码里套，不要写进 JSON。CS2 不会给紧跟色码的 `[` 上色，必须在 `[` 后再写一次 Green。空字符串关闭。不要把 `mp_maxrounds` / `mp_halftime_duration` / `mp_endmatch_votenextmap` 写成插件的生产默认值，短局测试由操作者改、测完由操作者写回。
+- `mp_halftime_pausetimer 1` 能拦住投票中途的 `round_start`。F2 在平局后约 2 秒仍停在回合结束画面，TerminateRound 会让引擎发 `cs_win_panel_match`。超时 20 秒后即使还是 `gamePhase=4`，引擎也不再发该事件，服务端约 34 秒后 `map_end`，客户端卡在局内平局。不要再靠改 TerminateRound 字段顺序修超时。1 秒内若还没有 `win_panel_match`，插件自己 `FireEvent(cs_win_panel_match)`。FailToDraw 仍先把 pausetimer 写回 0，并清掉 `TeamIntroPeriod` / `SwitchingTeamsAtRoundReset`。
+- 超时后卡住的中间 HUD 不是投票面板（VoteFailed 已关掉），是半场换边自动战绩板：`GamePhase=4` 超过 `mp_win_panel_display_time`（约 3 秒）后引擎弹出，和 TAB 不是同一路。`cs_win_panel_match` 关不掉它。开投前把 `mp_win_panel_display_time` 拉到投票时长+8，投票期间板子不会出现。`announce_phase_end` / `team_intro_end` 是开板，不是关板；FailToDraw 时不要发。FailToDraw 只把 `mp_halftime_pausetimer` 写回 0 再 TerminateRound，不要在这里把 `mp_halftime_duration` / `mp_team_intro_time` / `mp_win_panel_display_time` 写回，写回 duration=2 会新开一段 2 秒半场并把板子弹出来。这些 CVar 等 `win_panel_match` / ResetMatch 再还原。F1 通过时立刻写回。不要把该 CVar 写成插件生产默认值。
+- 有玩家在线时不 reload、不改 CVar。部署走 CS2 维护手册第 8 节。热重载 Vote Improver 不会换掉已缓存的 `TryStartVote`；换 2.1.x 实现需要进程重启。只热重载 Match Overtime 即可。
 - `VoteImproverApi.dll` 必须进 CSS `shared/VoteImproverApi/`。只放在 `plugins/VoteImprover/` 时，加载本插件会 `FileNotFoundException: VoteImproverApi`；失败后的 UNREGISTERED 槽只能进程重启清掉。
