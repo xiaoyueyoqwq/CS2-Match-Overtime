@@ -1,4 +1,6 @@
-# CS2 Match Overtime
+# CS2-Match-Overtime
+
+English | [简体中文](README.zh-CN.md)
 
 When a competitive match reaches a regulation tie (`12-12` at `mp_maxrounds 24`), this plugin pauses the game and asks **[Vote Improver](https://github.com/xiaoyueyoqwq/CS2-Vote-Improver)** for a humans-only yes/no vote. Pass continues vanilla overtime; fail ends the match as a draw.
 
