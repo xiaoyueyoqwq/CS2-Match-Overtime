@@ -1,7 +1,7 @@
 # Project Notes
 
 - 投票 GUI、选民、计票全部在 Vote Improver。本插件只暂停比赛、改运行时加时 CVar、按 `voteimprover:api` 回调解暂停或强制平局。
-- 选民必须是真人：不要在这里再实现一份 `vote` 监听，也不要把 bot 算进“有没有人可以投票”。
+- 选民必须是真人：不要在这里再实现一份 `vote` 监听，也不要把 bot 算进“有没有人可以投票”。托管 BOT 只认 `botidentity:api`（CS2-Bot-Identity）。不要加载、兼容或引用 BotHider / `bothider:api`。
 - 不要把 `mp_overtime_enable` 写进 `server.cfg` 或 gamemode cfg。有真人时在开局（`begin_new_match` / `match_start`）就把运行时加时打开；赛点再写已经来不及。新图 / 无人 / 投票失败时写回 0。
 - 测加时必须 `mp_halftime 1`。`mp_maxrounds 2` 且 `mp_halftime 0` 时，即使 `mp_overtime_enable` 已是 true，引擎也不开加时，会走平局结束画面。正式竞技默认有半场。半场的 `match_start` 不得把已 armed 的加时关掉。
 - 常规赛平局只投一次。加时里的 15-15 不要再暂停。
