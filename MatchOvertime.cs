@@ -1,3 +1,4 @@
+using System.Globalization;
 using BotIdentityApi;
 using VoteImproverApi;
 using CounterStrikeSharp.API;
@@ -46,7 +47,7 @@ public sealed class MatchOvertime : BasePlugin, IPluginConfig<MatchOvertimeConfi
     public MatchOvertimeConfig Config { get; set; } = new();
 
     public override string ModuleName => "Match Overtime";
-    public override string ModuleVersion => "1.0.13";
+    public override string ModuleVersion => "1.0.14";
     public override string ModuleAuthor => "CS2-Match-Overtime";
     public override string ModuleDescription =>
         "Pauses a regulation tie and waits for a Vote Improver humans-only vote before vanilla overtime or a draw.";
@@ -284,18 +285,19 @@ public sealed class MatchOvertime : BasePlugin, IPluginConfig<MatchOvertimeConfi
 
     private static bool ReadOvertimeEnabled()
     {
-        var overtime = ConVar.Find("mp_overtime_enable");
+        var overtime = ConVar<bool>.Find("mp_overtime_enable");
         if (overtime == null)
             return false;
         try
         {
-            return overtime.GetPrimitiveValue<bool>();
+            return overtime.Value;
         }
         catch
         {
             try
             {
-                return overtime.GetPrimitiveValue<int>() != 0;
+                var asInt = ConVar<int>.Find("mp_overtime_enable");
+                return asInt != null && asInt.Value != 0;
             }
             catch
             {
@@ -614,9 +616,9 @@ public sealed class MatchOvertime : BasePlugin, IPluginConfig<MatchOvertimeConfi
             return;
 
         _savedWinPanelDisplayTime ??= current;
-        var cvar = ConVar.Find("mp_win_panel_display_time");
+        var cvar = ConVar<float>.Find("mp_win_panel_display_time");
         if (cvar != null)
-            cvar.SetValue(hold);
+            cvar.ValueAsString = hold.ToString(CultureInfo.InvariantCulture);
         else
             Server.ExecuteCommand($"mp_win_panel_display_time {hold}");
         Logger.LogInformation("[MatchOT] stretch mp_win_panel_display_time {From} -> {To} ({Reason})", current, hold, reason);
@@ -627,9 +629,9 @@ public sealed class MatchOvertime : BasePlugin, IPluginConfig<MatchOvertimeConfi
         if (_savedWinPanelDisplayTime is not float value)
             return;
 
-        var cvar = ConVar.Find("mp_win_panel_display_time");
+        var cvar = ConVar<float>.Find("mp_win_panel_display_time");
         if (cvar != null)
-            cvar.SetValue(value);
+            cvar.ValueAsString = value.ToString(CultureInfo.InvariantCulture);
         else
             Server.ExecuteCommand($"mp_win_panel_display_time {value}");
         Logger.LogInformation("[MatchOT] restore mp_win_panel_display_time {Value}", value);
@@ -677,23 +679,25 @@ public sealed class MatchOvertime : BasePlugin, IPluginConfig<MatchOvertimeConfi
 
     private static float ReadFloatConVar(string name, float fallback)
     {
-        var cvar = ConVar.Find(name);
+        var cvar = ConVar<float>.Find(name);
         if (cvar == null)
             return fallback;
         try
         {
-            return cvar.GetPrimitiveValue<float>();
+            return cvar.Value;
         }
         catch
         {
             try
             {
-                return cvar.GetPrimitiveValue<int>();
+                var asInt = ConVar<int>.Find(name);
+                if (asInt != null)
+                    return asInt.Value;
             }
             catch
             {
-                return fallback;
             }
+            return fallback;
         }
     }
 
@@ -718,13 +722,13 @@ public sealed class MatchOvertime : BasePlugin, IPluginConfig<MatchOvertimeConfi
 
     private static bool IsCompetitive()
     {
-        var type = ConVar.Find("game_type");
-        var mode = ConVar.Find("game_mode");
+        var type = ConVar<int>.Find("game_type");
+        var mode = ConVar<int>.Find("game_mode");
         if (type == null || mode == null)
             return false;
         try
         {
-            return type.GetPrimitiveValue<int>() == 0 && mode.GetPrimitiveValue<int>() == 1;
+            return type.Value == 0 && mode.Value == 1;
         }
         catch
         {
@@ -739,12 +743,12 @@ public sealed class MatchOvertime : BasePlugin, IPluginConfig<MatchOvertimeConfi
 
     private static int RegulationTieScore()
     {
-        var maxRounds = ConVar.Find("mp_maxrounds");
+        var maxRounds = ConVar<int>.Find("mp_maxrounds");
         int max = 24;
         try
         {
             if (maxRounds != null)
-                max = maxRounds.GetPrimitiveValue<int>();
+                max = maxRounds.Value;
         }
         catch
         {
